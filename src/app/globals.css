@@ -80,6 +80,29 @@ h4 {
   font-weight: 400;
 }
 
+@media screen and (min-width: 768px) and (max-width: 1024px) {
+  h1 {
+    font-size: 1.8em;
+  }
+
+  h2 {
+    font-size: 1.4em;
+  }
+
+  h3 {
+    font-size: 1.15em;
+  }
+
+  h4 {
+    font-size: 1em;
+  }
+  p,
+  li,
+  a {
+    font-size: 0.9em;
+  }
+}
+
 @media screen and (max-width: 768px) {
   h1 {
     font-size: 1.5em;
