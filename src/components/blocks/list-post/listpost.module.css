@@ -44,6 +44,10 @@
   font-size: 0.8em;
 }
 
+.category {
+  border-bottom: 1px solid var(--foreground);
+}
+
 .postMeta > p {
   color: var(--description-color);
 }

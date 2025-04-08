@@ -14,11 +14,11 @@ export default function Navbar() {
   ];
   return (
     <nav className={Styles.nav}>
-      <Link href="/">
+      <a href="/">
         <div className={Styles.logo}>
           <h1>KelasSiang</h1>
         </div>
-      </Link>
+      </a>
       <MobileNav navLinks={navLinks} />
     </nav>
   );
