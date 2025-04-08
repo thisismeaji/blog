@@ -1,0 +1,42 @@
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 2rem;
+  flex-wrap: wrap;
+}
+
+.pageButton,
+.navButton {
+  background-color: transparent;
+  border: 1px solid var(--b-color);
+  color: var(--foreground);
+  padding: 0.4rem 0.75rem;
+  border-radius: 5px;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+
+.pageButton:hover,
+.navButton:hover {
+  background-color: var(--hover-color);
+  color: var(--background);
+}
+
+.activePageButton {
+  background-color: var(--b-color);
+  color: var(--foreground);
+  font-weight: bold;
+}
+
+.navButton[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ellipsis {
+  padding: 0.4rem 0.75rem;
+  color: #94a3b8;
+}
