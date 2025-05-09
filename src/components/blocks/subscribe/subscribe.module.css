@@ -1,0 +1,77 @@
+.content {
+  width: 100%;
+  max-width: 1300px;
+  padding: 4rem 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  justify-content: center;
+  align-items: center;
+  border-radius: 10px;
+  background: #12c2e9; /* fallback for old browsers */
+  background: -webkit-linear-gradient(
+    to right,
+    #f64f59,
+    #c471ed,
+    #12c2e9
+  ); /* Chrome 10-25, Safari 5.1-6 */
+  background: linear-gradient(
+    to right,
+    #f64f59,
+    #c471ed,
+    #12c2e9
+  ); /* W3C, IE 10+/ Edge, Firefox 16+, Chrome 26+, Opera 12+, Safari 7+ */
+  color: var(--background);
+}
+
+.content h2,
+.content p {
+  max-width: 700px;
+  text-align: center;
+}
+
+.subscribe {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  max-width: 600px;
+}
+
+.subscribe input {
+  padding: 12px;
+  width: 100%;
+  border-radius: 5px;
+  cursor: pointer;
+  border: none;
+  font-family: "Poppins";
+}
+
+.subscribe button {
+  padding: 12px 32px;
+  border-radius: 5px;
+  border: none;
+  background-color: var(--foreground);
+  color: var(--background);
+}
+
+@media screen and (max-width: 768px) {
+  .section {
+    padding: 2rem 1rem;
+  }
+  .content {
+    padding: 2rem 1rem;
+  }
+
+  .subscribe {
+    flex-direction: column;
+    margin-top: 0.5rem;
+  }
+
+  .section input {
+    padding: 10px;
+  }
+  .subscribe button {
+    padding: 10px 20px;
+  }
+}

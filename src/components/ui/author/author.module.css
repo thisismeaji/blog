@@ -1,0 +1,52 @@
+.author {
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  gap: 0.8rem;
+  line-height: 1;
+  text-align: left;
+}
+
+.author img {
+  max-width: 40px;
+  height: 100%;
+  border-radius: 100%;
+}
+
+.author div {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.author div p {
+  line-height: 1.5;
+  font-size: 14px;
+}
+
+.author div p:first-child {
+  cursor: pointer;
+}
+
+.author div p:last-child {
+  color: #6b89bb;
+}
+
+@media screen and (min-width: 768px) and (max-width: 1200px) {
+  .author div p {
+    font-size: 12px;
+  }
+
+  .author img {
+    max-width: 35px;
+  }
+}
+
+@media screen and (max-width: 768px) {
+  .author img {
+    max-width: 30px;
+  }
+  .author div p {
+    font-size: 10px;
+  }
+}

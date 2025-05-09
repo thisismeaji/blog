@@ -1,0 +1,25 @@
+.badge {
+  padding: 0.5rem 1rem;
+  background-color: var(--badge);
+  border-radius: 20px;
+  font-size: 14px;
+  color: var(--foreground);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.badge:hover {
+  background-color: var(--badge-hover);
+}
+
+@media screen and (min-width: 768px) and (max-width: 1200px) {
+  .badge {
+    font-size: 12px;
+  }
+}
+
+@media screen and (max-width: 768px) {
+  .badge {
+    font-size: 10px;
+  }
+}
