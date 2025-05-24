@@ -28,13 +28,7 @@ export default function Navbar() {
     <nav className={Styles.nav}>
       <div className={Styles.logo}>
         <Link href="/">
-          <Image
-            src="/images/logo.png"
-            width={512}
-            height={512}
-            alt="Logo Vurply.com"
-          />
-          <p>Vurply.com</p>
+          <p>Blog</p>
         </Link>
       </div>
       <MobileNav navLinks={navLinks} />
