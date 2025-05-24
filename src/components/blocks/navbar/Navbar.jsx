@@ -10,8 +10,16 @@ const navLinks = [
     href: "/",
   },
   {
-    name: "Tutorial",
-    href: "/tutorial",
+    name: "Product Roadmap",
+    href: "/product-roadmap",
+  },
+  {
+    name: "Costumer Feedback",
+    href: "/costumer-feedback",
+  },
+  {
+    name: "Product Management",
+    href: "/product-management",
   },
 ];
 
