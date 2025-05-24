@@ -6,7 +6,6 @@ import Image from "next/image";
 import Badge from "@/components/ui/badge/Badge";
 import Author from "@/components/ui/author/Author";
 import RelatedPosts from "@/components/blocks/relatedposts/RelatedPosts";
-import Subscribe from "@/components/blocks/subscribe/Subscribe";
 
 export async function generateMetadata(props) {
   const params = await props.params;
@@ -39,13 +38,18 @@ export default async function PostPage(props) {
             <p>{post.metatags}</p>
             <Author />
           </div>
-          <Image
-            src={post.image}
-            alt={post.title}
-            width={1920}
-            height={1080}
-            className={Styles.thumbnail}
-          />
+
+          {/* Hanya tampilkan gambar jika post.image ada */}
+          {post.image && (
+            <Image
+              src={post.image}
+              alt={post.title}
+              width={1920}
+              height={1080}
+              className={Styles.thumbnail}
+            />
+          )}
+
           <div className={Styles.content}>
             <ReactMarkdown>{post.content}</ReactMarkdown>
           </div>
@@ -57,7 +61,7 @@ export default async function PostPage(props) {
           category={post.category}
           posts={posts}
         />
-      </section> 
+      </section>
     </>
   );
 }
