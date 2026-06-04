@@ -13,24 +13,10 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json()
-    const client = await clientPromise
-    const db = client.db()
-    
-    const lastItem = await db.collection("users").find().sort({ id: -1 }).limit(1).toArray()
-    const newId = lastItem.length > 0 ? (lastItem[0].id || 0) + 1 : 1
-
-    const newUser = {
-      ...body,
-      id: newId,
-    }
-
-    await db.collection("users").insertOne(newUser)
-    return NextResponse.json({ success: true, user: newUser })
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
+  return NextResponse.json(
+    { error: "Method Not Allowed. User registration is disabled." },
+    { status: 405 }
+  )
 }
 
 export async function PUT(req: NextRequest) {

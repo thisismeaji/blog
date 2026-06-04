@@ -93,7 +93,7 @@ const data = {
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
 
   const sidebarUser = React.useMemo(() => {
     if (session?.user) {
@@ -129,7 +129,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <NavSecondary items={data.navSecondary} className="mt-auto" />
         </SidebarContent>
         <SidebarFooter>
-          <NavUser user={sidebarUser} />
+          <NavUser user={sidebarUser} isLoading={status === "loading"} />
         </SidebarFooter>
       </Sidebar>
       <SearchDialog />

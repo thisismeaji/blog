@@ -1,6 +1,7 @@
 import NextAuth from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
 import clientPromise from "@/lib/mongodb"
+import { verifyPassword } from "@/lib/crypto"
 
 export const authOptions = {
   providers: [
@@ -24,14 +25,26 @@ export const authOptions = {
           })
 
           if (user) {
-            // For local development and demonstration, verify password is 'password123'
             const passwordProvided = credentials.password
-            if (passwordProvided === "password123") {
-              return {
-                id: user.id.toString(),
-                name: user.header,
-                email: user.type,
-                role: user.role,
+            
+            // Verify hashed password if present, otherwise fallback to legacy demo password
+            if (user.password) {
+              if (verifyPassword(passwordProvided, user.password)) {
+                return {
+                  id: user.id.toString(),
+                  name: user.header,
+                  email: user.type,
+                  role: user.role,
+                }
+              }
+            } else {
+              if (passwordProvided === "password123") {
+                return {
+                  id: user.id.toString(),
+                  name: user.header,
+                  email: user.type,
+                  role: user.role,
+                }
               }
             }
           }
