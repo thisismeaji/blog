@@ -13,6 +13,7 @@ import TaskItem from "@tiptap/extension-task-item";
 import TiptapImage from "@tiptap/extension-image";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { DOMParser as ProseMirrorDOMParser } from "prosemirror-model";
 import { Input } from "@/components/ui/input";
 import {
   Bold,
@@ -331,6 +332,68 @@ export default function TextEditor({
     editorProps: {
       attributes: {
         class: "focus:outline-none outline-none min-h-[400px] py-2",
+      },
+      transformPastedHTML(html) {
+        if (typeof window === "undefined") return html;
+        try {
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(html, "text/html");
+
+          // Traverse and sanitize elements
+          const allElements = doc.body.querySelectorAll("*");
+          allElements.forEach((el) => {
+            // Remove style and class attributes to strip fonts, colors, sizes, and background styles
+            el.removeAttribute("style");
+            el.removeAttribute("class");
+
+            const tagName = el.tagName.toLowerCase();
+            if (tagName === "a") {
+              const href = el.getAttribute("href");
+              while (el.attributes.length > 0) {
+                el.removeAttribute(el.attributes[0].name);
+              }
+              if (href) el.setAttribute("href", href);
+            } else if (tagName === "img") {
+              const src = el.getAttribute("src");
+              const alt = el.getAttribute("alt");
+              while (el.attributes.length > 0) {
+                el.removeAttribute(el.attributes[0].name);
+              }
+              if (src) el.setAttribute("src", src);
+              if (alt) el.setAttribute("alt", alt);
+            } else {
+              while (el.attributes.length > 0) {
+                el.removeAttribute(el.attributes[0].name);
+              }
+            }
+          });
+
+          return doc.body.innerHTML;
+        } catch (err) {
+          console.error("Paste sanitization error", err);
+          return html;
+        }
+      },
+      handlePaste(view, event) {
+        const text = event.clipboardData?.getData("text/plain");
+        const html = event.clipboardData?.getData("text/html");
+
+        // If there's already rich HTML, let transformPastedHTML handle it (to strip custom styles)
+        if (html && isRichHtml(html)) return false;
+
+        // If it is plain text and matches Markdown formatting, parse it to HTML
+        if (text && isMarkdown(text)) {
+          const parsedHtml = convertMarkdownToHtml(text);
+          const element = document.createElement("div");
+          element.innerHTML = parsedHtml;
+
+          const slice = ProseMirrorDOMParser.fromSchema(view.state.schema).parseSlice(element);
+          const transaction = view.state.tr.replaceSelection(slice);
+          view.dispatch(transaction);
+          return true; // paste handled
+        }
+
+        return false;
       },
       handleKeyDown: (view, event) => {
         const { slashMenu: currentSlashMenu, commands } = stateRef.current;
@@ -730,4 +793,225 @@ export default function TextEditor({
       </div>
     </div>
   );
+}
+
+// Markdown Helper Functions for paste conversion
+function isMarkdown(text: string): boolean {
+  const markdownRegexes = [
+    /^\s*#{1,6}\s+\S+/m,        // Headings
+    /\*\*[^*]+\*\*/,            // Bold
+    /\*[^*]+\*/,                // Italic
+    /^\s*[-*+]\s+/m,            // Unordered list
+    /^\s*\d+\.\s+/m,            // Ordered list
+    /\[[^\]]+\]\([^)]+\)/,      // Link
+    /`[^`]+`/,                  // Inline code
+    /```[\s\S]+```/,            // Code block
+    /^\s*>\s+\S+/m,             // Blockquote
+  ];
+  return markdownRegexes.some((regex) => regex.test(text));
+}
+
+function parseInlineStyles(text: string): string {
+  let res = text;
+  // Bold-Italic (***text*** or ___text___)
+  res = res.replace(/\*\*\*(.*?)\*\*\*/g, "<strong><em>$1</em></strong>");
+  res = res.replace(/___(.*?)___/g, "<strong><em>$1</em></strong>");
+  // Bold (**text** or __text__)
+  res = res.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+  res = res.replace(/__(.*?)__/g, "<strong>$1</strong>");
+  // Italic (*text* or _text_)
+  res = res.replace(/\*(.*?)\*/g, "<em>$1</em>");
+  res = res.replace(/_(.*?)_/g, "<em>$1</em>");
+  // Inline Code (`code`)
+  res = res.replace(/`(.*?)`/g, "<code>$1</code>");
+  // Images (![alt](url))
+  res = res.replace(/!\[(.*?)\]\((.*?)\)/g, '<img src="$2" alt="$1" />');
+  // Links ([text](url))
+  res = res.replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2">$1</a>');
+  return res;
+}
+
+function isRichHtml(html: string): boolean {
+  if (!html) return false;
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, "text/html");
+    const richTags = [
+      "h1", "h2", "h3", "h4", "h5", "h6",
+      "ul", "ol", "li",
+      "blockquote",
+      "table", "tr", "th", "td",
+      "hr",
+      "img",
+      "a",
+      "strong", "b",
+      "em", "i"
+    ];
+    return richTags.some((tag) => doc.querySelector(tag) !== null);
+  } catch (e) {
+    return false;
+  }
+}
+
+function convertMarkdownToHtml(markdown: string, isNested: boolean = false): string {
+  let escaped = markdown;
+  if (!isNested) {
+    escaped = markdown
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
+  const lines = escaped.split(/\r?\n/);
+  const processed: string[] = [];
+
+  let inCodeBlock = false;
+  let codeLines: string[] = [];
+  let currentListType: "ul" | "ol" | "taskList" | null = null;
+  let inBlockquote = false;
+  let blockquoteLines: string[] = [];
+
+  const flushList = () => {
+    if (currentListType) {
+      if (currentListType === "taskList") {
+        processed.push("</ul>");
+      } else {
+        processed.push(`</${currentListType}>`);
+      }
+      currentListType = null;
+    }
+  };
+
+  const flushBlockquote = () => {
+    if (inBlockquote) {
+      const innerHtml = convertMarkdownToHtml(blockquoteLines.join("\n"), true);
+      processed.push(`<blockquote>${innerHtml}</blockquote>`);
+      blockquoteLines = [];
+      inBlockquote = false;
+    }
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    if (inCodeBlock) {
+      if (trimmed.startsWith("```")) {
+        inCodeBlock = false;
+        const codeContent = codeLines.join("\n");
+        processed.push(`<pre><code>${codeContent}</code></pre>`);
+        codeLines = [];
+      } else {
+        codeLines.push(line);
+      }
+      continue;
+    }
+
+    if (trimmed.startsWith("```")) {
+      flushList();
+      flushBlockquote();
+      inCodeBlock = true;
+      continue;
+    }
+
+    const blockquoteMatch = line.match(/^\s*&gt;\s*(.*)$/);
+    if (blockquoteMatch) {
+      flushList();
+      inBlockquote = true;
+      blockquoteLines.push(blockquoteMatch[1]);
+      continue;
+    } else {
+      flushBlockquote();
+    }
+
+    if (trimmed.match(/^(?:-{3,}|\*{3,}|_{3,})$/)) {
+      flushList();
+      processed.push("<hr />");
+      continue;
+    }
+
+    const headingMatch = line.match(/^\s*(#{1,6})\s+(.*)$/);
+    if (headingMatch) {
+      flushList();
+      const level = headingMatch[1].length;
+      const parsedText = parseInlineStyles(headingMatch[2]);
+      processed.push(`<h${level}>${parsedText}</h${level}>`);
+      continue;
+    }
+
+    const taskCheckedMatch = line.match(/^\s*[-*+]\s+\[[xX]\]\s+(.*)$/);
+    if (taskCheckedMatch) {
+      if (currentListType !== "taskList") {
+        flushList();
+        processed.push('<ul data-type="taskList">');
+        currentListType = "taskList";
+      }
+      const parsedText = parseInlineStyles(taskCheckedMatch[1]);
+      processed.push(`<li data-type="taskItem" data-checked="true">${parsedText}</li>`);
+      continue;
+    }
+
+    const taskUncheckedMatch = line.match(/^\s*[-*+]\s+\[\s*\]\s+(.*)$/);
+    if (taskUncheckedMatch) {
+      if (currentListType !== "taskList") {
+        flushList();
+        processed.push('<ul data-type="taskList">');
+        currentListType = "taskList";
+      }
+      const parsedText = parseInlineStyles(taskUncheckedMatch[1]);
+      processed.push(`<li data-type="taskItem" data-checked="false">${parsedText}</li>`);
+      continue;
+    }
+
+    const ulMatch = line.match(/^\s*[-*+]\s+(.*)$/);
+    if (ulMatch) {
+      if (currentListType !== "ul") {
+        flushList();
+        processed.push("<ul>");
+        currentListType = "ul";
+      }
+      const parsedText = parseInlineStyles(ulMatch[1]);
+      processed.push(`<li>${parsedText}</li>`);
+      continue;
+    }
+
+    const olMatch = line.match(/^\s*\d+\.\s+(.*)$/);
+    if (olMatch) {
+      if (currentListType !== "ol") {
+        flushList();
+        processed.push("<ol>");
+        currentListType = "ol";
+      }
+      const parsedText = parseInlineStyles(olMatch[1]);
+      processed.push(`<li>${parsedText}</li>`);
+      continue;
+    }
+
+    if (trimmed === "") {
+      flushList();
+      processed.push("");
+      continue;
+    }
+
+    const parsedText = parseInlineStyles(trimmed);
+    if (currentListType) {
+      const lastIdx = processed.length - 1;
+      if (lastIdx >= 0 && processed[lastIdx].endsWith("</li>")) {
+        processed[lastIdx] = processed[lastIdx].replace(/<\/li>$/, ` ${parsedText}</li>`);
+      } else {
+        processed.push(`<li>${parsedText}</li>`);
+      }
+    } else {
+      processed.push(`<p>${parsedText}</p>`);
+    }
+  }
+
+  flushList();
+  flushBlockquote();
+  if (inCodeBlock) {
+    const codeContent = codeLines.join("\n");
+    processed.push(`<pre><code>${codeContent}</code></pre>`);
+  }
+
+  return processed.join("\n");
 }

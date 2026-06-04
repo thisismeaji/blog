@@ -17,3 +17,20 @@ export function useIsMobile() {
 
   return !!isMobile
 }
+
+export function useSidebarIsMobile() {
+  const [isSidebarMobile, setIsSidebarMobile] = React.useState<boolean | undefined>(undefined)
+
+  React.useEffect(() => {
+    const mql = window.matchMedia("(max-width: 1399px)")
+    const onChange = () => {
+      setIsSidebarMobile(window.innerWidth < 1400)
+    }
+    mql.addEventListener("change", onChange)
+    setIsSidebarMobile(window.innerWidth < 1400)
+    return () => mql.removeEventListener("change", onChange)
+  }, [])
+
+  return !!isSidebarMobile
+}
+

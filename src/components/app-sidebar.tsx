@@ -100,10 +100,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       return {
         name: session.user.name || "User",
         email: session.user.email || "",
-        avatar: session.user.image || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(session.user.name || "User")}`,
+        avatar: session.user.image || "",
       }
     }
-    return data.user
+    return {
+      name: "shadcn",
+      email: "m@example.com",
+      avatar: "",
+    }
   }, [session])
 
   return (

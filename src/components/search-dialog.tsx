@@ -84,19 +84,19 @@ export function SearchDialog() {
       onClick={() => setOpen(false)}
     >
       <div
-        className="relative w-full max-w-2xl rounded-xl border border-zinc-800 bg-zinc-950/95 shadow-2xl flex flex-col overflow-hidden select-none animate-in zoom-in-95 duration-200"
+        className="relative w-full max-w-2xl rounded-xl border bg-popover text-popover-foreground shadow-2xl flex flex-col overflow-hidden select-none animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header containing tabs & search bar */}
-        <div className="p-4 space-y-3 border-b border-zinc-900">
+        <div className="p-4 space-y-3 border-b">
           <div className="flex gap-2">
             <button
               type="button"
               onClick={() => setActiveTab("app")}
               className={`px-2 py-0.5 rounded text-xs font-semibold transition-colors cursor-pointer ${
                 activeTab === "app"
-                  ? "bg-blue-600 text-white"
-                  : "bg-zinc-900 text-zinc-400 hover:text-white"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
               }`}
             >
               App
@@ -106,8 +106,8 @@ export function SearchDialog() {
               onClick={() => setActiveTab("pages")}
               className={`px-2 py-0.5 rounded text-xs font-semibold transition-colors cursor-pointer ${
                 activeTab === "pages"
-                  ? "bg-blue-600 text-white"
-                  : "bg-zinc-900 text-zinc-400 hover:text-white"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
               }`}
             >
               Pages
@@ -121,12 +121,12 @@ export function SearchDialog() {
               placeholder="What are you searching for?"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-transparent border-0 text-white text-base outline-none placeholder:text-zinc-500"
+              className="w-full bg-transparent border-0 text-foreground text-base outline-none placeholder:text-muted-foreground"
             />
             <button
               type="button"
               onClick={() => setOpen(false)}
-              className="border border-zinc-800 bg-zinc-900 text-zinc-400 text-[10px] px-1.5 py-0.5 rounded font-mono select-none hover:text-white hover:border-zinc-700 cursor-pointer shrink-0"
+              className="border bg-muted text-muted-foreground text-[10px] px-1.5 py-0.5 rounded font-mono select-none hover:text-foreground hover:bg-accent cursor-pointer shrink-0"
             >
               Esc
             </button>
@@ -136,7 +136,7 @@ export function SearchDialog() {
         {/* Results List */}
         <div className="p-2 max-h-[320px] overflow-y-auto space-y-1">
           {filteredItems.length === 0 ? (
-            <div className="py-6 text-center text-sm text-zinc-500">
+            <div className="py-6 text-center text-sm text-muted-foreground">
               No results found for "{searchQuery}"
             </div>
           ) : (
@@ -145,9 +145,9 @@ export function SearchDialog() {
                 key={item.title}
                 type="button"
                 onClick={() => handleSelect(item.url)}
-                className="flex items-center gap-3 w-full text-left px-3 py-2.5 rounded-lg text-zinc-300 hover:bg-zinc-900 hover:text-white transition-colors duration-150 cursor-pointer"
+                className="flex items-center gap-3 w-full text-left px-3 py-2.5 rounded-lg text-foreground hover:bg-accent hover:text-accent-foreground transition-colors duration-150 cursor-pointer"
               >
-                <FileText className="size-4 text-zinc-500 shrink-0" />
+                <FileText className="size-4 text-muted-foreground shrink-0" />
                 <span className="text-sm font-medium">{item.title}</span>
               </button>
             ))

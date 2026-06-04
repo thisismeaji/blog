@@ -20,6 +20,7 @@ import { Area, AreaChart, CartesianGrid, XAxis } from "recharts"
 import { toast } from "sonner"
 import { z } from "zod"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 
 import { useIsMobile } from "@/hooks/use-mobile"
 import { Badge } from "@/components/ui/badge"
@@ -74,7 +75,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs"
-import { Trash2Icon, CircleCheckIcon, LoaderIcon, EllipsisVerticalIcon, Columns3Icon, ChevronDownIcon, PlusIcon, ChevronsLeftIcon, ChevronLeftIcon, ChevronRightIcon, ChevronsRightIcon, TrendingUpIcon } from "lucide-react"
+import { Trash2Icon, CircleCheckIcon, LoaderIcon, EllipsisVerticalIcon, Columns3Icon, ChevronDownIcon, PlusIcon, ChevronsLeftIcon, ChevronLeftIcon, ChevronRightIcon, ChevronsRightIcon, TrendingUpIcon, ImageIcon } from "lucide-react"
 
 export const schema = z.object({
   id: z.number(),
@@ -84,6 +85,7 @@ export const schema = z.object({
   target: z.string(),
   limit: z.string(),
   reviewer: z.string(),
+  uploadedImage: z.string().optional(),
 })
 
 const columns: ColumnDef<z.infer<typeof schema>>[] = [
@@ -92,14 +94,28 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
     header: "Post Title",
     cell: ({ row, table }) => {
       const onView = (table.options.meta as any)?.onView
+      const imageUrl = row.original.uploadedImage
       return (
-        <Button
-          variant="link"
-          className="w-fit px-0 text-left text-foreground hover:no-underline font-medium"
-          onClick={() => onView?.(row.original)}
-        >
-          {row.original.header}
-        </Button>
+        <div className="flex items-center gap-3 py-0.5">
+          {imageUrl ? (
+            <img
+              src={imageUrl}
+              alt={row.original.header}
+              className="size-10 rounded-md object-cover border border-border shrink-0"
+            />
+          ) : (
+            <div className="size-10 rounded-md bg-muted border border-border flex items-center justify-center shrink-0 text-muted-foreground">
+              <ImageIcon className="size-4 opacity-60" />
+            </div>
+          )}
+          <Button
+            variant="link"
+            className="w-fit px-0 text-left text-foreground hover:no-underline font-medium whitespace-normal"
+            onClick={() => onView?.(row.original)}
+          >
+            {row.original.header}
+          </Button>
+        </div>
       )
     },
     enableHiding: false,
@@ -267,6 +283,7 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
       const onEdit = (table.options.meta as any)?.onEdit
       const onDelete = (table.options.meta as any)?.onDelete
       const onRestore = (table.options.meta as any)?.onRestore
+      const onDeletePermanent = (table.options.meta as any)?.onDeletePermanent
       const isDeleted = row.original.status === "Deleted"
 
       return (
@@ -290,9 +307,17 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             {isDeleted ? (
-              <DropdownMenuItem onClick={() => onRestore?.(row.original.id)}>
-                Restore
-              </DropdownMenuItem>
+              <>
+                <DropdownMenuItem onClick={() => onRestore?.(row.original.id)}>
+                  Restore
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  variant="destructive"
+                  onClick={() => onDeletePermanent?.(row.original.id)}
+                >
+                  Delete Permanent
+                </DropdownMenuItem>
+              </>
             ) : (
               <DropdownMenuItem
                 variant="destructive"
@@ -309,16 +334,56 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
 ]
 
 
+const columnLabels: Record<string, string> = {
+  header: "Post Title",
+  slug: "Slug",
+  type: "Category",
+  status: "Status",
+  target: "Views",
+  limit: "Comments",
+  date: "Date",
+  reviewer: "Author",
+}
+
 export function DataTable({
   data: initialData,
+  categories: initialCategories = [],
 }: {
   data: z.infer<typeof schema>[]
+  categories?: any[]
 }) {
-  const [data, setData] = React.useState<z.infer<typeof schema>[]>([])
-  const [categories, setCategories] = React.useState<any[]>([])
+  const router = useRouter()
+  const [data, setData] = React.useState<z.infer<typeof schema>[]>(initialData)
+  const [isLoading, setIsLoading] = React.useState(false)
+  const [categories, setCategories] = React.useState<any[]>(initialCategories)
   const [activeTab, setActiveTab] = React.useState("all")
+  const [skeletonCount, setSkeletonCount] = React.useState(3)
+
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("data-table-count")
+      if (saved) {
+        setSkeletonCount(Number(saved))
+      }
+    }
+  }, [])
+  const isMobile = useIsMobile()
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({})
+
+  React.useEffect(() => {
+    if (isMobile) {
+      setColumnVisibility({
+        slug: false,
+        target: false,
+        limit: false,
+        date: false,
+        reviewer: false,
+      })
+    } else {
+      setColumnVisibility({})
+    }
+  }, [isMobile])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     []
   )
@@ -334,6 +399,7 @@ export function DataTable({
 
   const loadData = async () => {
     try {
+      setIsLoading(true)
       const res = await fetch("/api/posts")
       const json = await res.json()
       if (Array.isArray(json)) {
@@ -347,12 +413,11 @@ export function DataTable({
       }
     } catch (err) {
       console.error("Failed to load data", err)
+    } finally {
+      setIsLoading(false)
     }
   }
 
-  React.useEffect(() => {
-    loadData()
-  }, [])
 
   const handleSave = async (updatedItem: z.infer<typeof schema>) => {
     try {
@@ -387,6 +452,13 @@ export function DataTable({
     return data.filter((item) => item.status !== "Deleted")
   }, [data, activeTab])
 
+  React.useEffect(() => {
+    if (!isLoading && typeof window !== "undefined" && activeTab === "all") {
+      localStorage.setItem("data-table-count", displayedData.length.toString())
+      setSkeletonCount(displayedData.length > 0 ? displayedData.length : 3)
+    }
+  }, [isLoading, displayedData.length, activeTab])
+
   const table = useReactTable({
     data: displayedData,
     columns,
@@ -414,9 +486,7 @@ export function DataTable({
         setDrawerOpen(true)
       },
       onEdit: (item: z.infer<typeof schema>) => {
-        setSelectedItem(item)
-        setDrawerMode("edit")
-        setDrawerOpen(true)
+        router.push(`/dashboard/add-post?id=${item.id}`)
       },
       onDelete: async (id: number) => {
         try {
@@ -427,7 +497,7 @@ export function DataTable({
             setData((prev) =>
               prev.map((item) => (item.id === id ? { ...item, status: "Deleted" } : item))
             )
-            toast.success("Post marked as deleted")
+            toast.success("Post deleted successfully")
           } else {
             toast.error("Failed to delete post")
           }
@@ -447,13 +517,29 @@ export function DataTable({
             setData((prev) =>
               prev.map((item) => (item.id === id ? { ...item, status: "In Process" } : item))
             )
-            toast.success("Post restored as draft")
+            toast.success("Post restored successfully")
           } else {
             toast.error("Failed to restore post")
           }
         } catch (err) {
           console.error("Restore error", err)
           toast.error("An error occurred while restoring")
+        }
+      },
+      onDeletePermanent: async (id: number) => {
+        try {
+          const res = await fetch(`/api/posts?id=${id}&permanent=true`, {
+            method: "DELETE",
+          })
+          if (res.ok) {
+            setData((prev) => prev.filter((item) => item.id !== id))
+            toast.success("Post permanently deleted")
+          } else {
+            toast.error("Failed to permanently delete post")
+          }
+        } catch (err) {
+          console.error("Permanent delete error", err)
+          toast.error("An error occurred while deleting")
         }
       },
     },
@@ -466,8 +552,8 @@ export function DataTable({
         onValueChange={setActiveTab}
         className="w-full flex-col justify-start gap-6"
       >
-      <div className="flex items-center justify-between px-4 lg:px-6">
-        <TabsList className="flex **:data-[slot=badge]:size-5 **:data-[slot=badge]:rounded-full **:data-[slot=badge]:bg-muted-foreground/30 **:data-[slot=badge]:px-1">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between px-4 lg:px-6 w-full">
+        <TabsList className="w-full flex justify-start overflow-x-auto no-scrollbar md:w-auto **:data-[slot=badge]:size-5 **:data-[slot=badge]:rounded-full **:data-[slot=badge]:bg-muted-foreground/30 **:data-[slot=badge]:px-1">
           <TabsTrigger value="all">
             All Posts <Badge variant="secondary">{data.filter(d => d.status !== "Deleted").length}</Badge>
           </TabsTrigger>
@@ -481,16 +567,16 @@ export function DataTable({
             Deleted <Badge variant="secondary">{data.filter(d => d.status === "Deleted").length}</Badge>
           </TabsTrigger>
         </TabsList>
-        <div className="flex items-center gap-2">
+        <div className="flex w-full flex-col md:flex-row items-center gap-2 *:w-full md:*:w-auto md:w-auto md:*:flex-none">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" className="w-full">
                 <Columns3Icon data-icon="inline-start" />
                 Columns
                 <ChevronDownIcon data-icon="inline-end" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-32">
+            <DropdownMenuContent align="end" className="w-48">
               {table
                 .getAllColumns()
                 .filter(
@@ -508,7 +594,7 @@ export function DataTable({
                         column.toggleVisibility(!!value)
                       }
                     >
-                      {column.id}
+                      {columnLabels[column.id] || column.id}
                     </DropdownMenuCheckboxItem>
                   )
                 })}
@@ -517,7 +603,7 @@ export function DataTable({
           <Button variant="outline" size="sm" asChild>
             <Link href="/dashboard/add-post">
               <PlusIcon />
-              <span className="hidden lg:inline">Add Post</span>
+              <span>Add Post</span>
             </Link>
           </Button>
         </div>
@@ -526,7 +612,7 @@ export function DataTable({
         value={activeTab}
         className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6"
       >
-        <div className="overflow-hidden rounded-lg border">
+        <div className="overflow-x-auto rounded-lg border">
           <Table>
             <TableHeader className="sticky top-0 z-10 bg-muted">
               {table.getHeaderGroups().map((headerGroup) => (
@@ -547,7 +633,46 @@ export function DataTable({
               ))}
             </TableHeader>
             <TableBody>
-              {table.getRowModel().rows?.length ? (
+              {isLoading ? (
+                Array.from({ length: skeletonCount }).map((_, rowIndex) => (
+                  <TableRow key={`skeleton-${rowIndex}`} className="hover:bg-transparent">
+                    {table.getVisibleFlatColumns().map((column) => {
+                      let cellClass = ""
+                      let skeletonClass = "h-4 rounded bg-muted-foreground/10 animate-pulse"
+                      
+                      if (column.id === "header") {
+                        return (
+                          <TableCell key={column.id} className={cellClass}>
+                            <div className="flex items-center gap-3 py-0.5">
+                              <div className="size-10 rounded-md bg-muted-foreground/10 animate-pulse shrink-0" />
+                              <div className="h-4 w-48 rounded bg-muted-foreground/10 animate-pulse" />
+                            </div>
+                          </TableCell>
+                        )
+                      } else if (column.id === "type") {
+                        skeletonClass += " w-24 h-5 rounded-full"
+                      } else if (column.id === "status") {
+                        skeletonClass += " w-20 h-5 rounded-full"
+                      } else if (column.id === "target" || column.id === "limit") {
+                        cellClass = "text-right"
+                        skeletonClass += " w-12 ml-auto"
+                      } else if (column.id === "date" || column.id === "reviewer") {
+                        skeletonClass += " w-24"
+                      } else if (column.id === "actions") {
+                        skeletonClass += " size-8 rounded-md ml-auto"
+                      } else {
+                        skeletonClass += " w-full max-w-[100px]"
+                      }
+                      
+                      return (
+                        <TableCell key={column.id} className={cellClass}>
+                          <div className={skeletonClass} />
+                        </TableCell>
+                      )
+                    })}
+                  </TableRow>
+                ))
+              ) : table.getRowModel().rows?.length ? (
                 table.getRowModel().rows.map((row) => (
                   <TableRow key={row.id}>
                     {row.getVisibleCells().map((cell) => (

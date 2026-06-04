@@ -226,6 +226,16 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
   },
 ]
 
+const columnLabels: Record<string, string> = {
+  header: "Category Name",
+  type: "Slug",
+  status: "Status",
+  target: "Views",
+  limit: "Description",
+  reviewer: "Creator",
+  level: "Type",
+}
+
 export function CategoryTable({
   data: initialData,
 }: {
@@ -234,10 +244,35 @@ export function CategoryTable({
   const { data: session } = useSession()
   const isAdmin = (session?.user as any)?.role === "Administrator"
 
-  const [data, setData] = React.useState<z.infer<typeof schema>[]>([])
+  const [data, setData] = React.useState<z.infer<typeof schema>[]>(initialData)
+  const [isLoading, setIsLoading] = React.useState(false)
   const [activeTab, setActiveTab] = React.useState("all")
+  const [skeletonCount, setSkeletonCount] = React.useState(3)
+
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("category-table-count")
+      if (saved) {
+        setSkeletonCount(Number(saved))
+      }
+    }
+  }, [])
+  const isMobile = useIsMobile()
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({})
+
+  React.useEffect(() => {
+    if (isMobile) {
+      setColumnVisibility({
+        target: false,
+        limit: false,
+        reviewer: false,
+        level: false,
+      })
+    } else {
+      setColumnVisibility({})
+    }
+  }, [isMobile])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     []
   )
@@ -253,6 +288,7 @@ export function CategoryTable({
 
   const loadData = async () => {
     try {
+      setIsLoading(true)
       const res = await fetch("/api/categories")
       const json = await res.json()
       if (Array.isArray(json)) {
@@ -260,12 +296,11 @@ export function CategoryTable({
       }
     } catch (err) {
       console.error("Failed to load categories", err)
+    } finally {
+      setIsLoading(false)
     }
   }
 
-  React.useEffect(() => {
-    loadData()
-  }, [])
 
   const handleSave = async (updatedItem: z.infer<typeof schema>) => {
     try {
@@ -323,6 +358,13 @@ export function CategoryTable({
     }
     return data.filter((item) => item.status !== "Deleted")
   }, [data, activeTab])
+
+  React.useEffect(() => {
+    if (!isLoading && typeof window !== "undefined" && activeTab === "all") {
+      localStorage.setItem("category-table-count", displayedData.length.toString())
+      setSkeletonCount(displayedData.length > 0 ? displayedData.length : 3)
+    }
+  }, [isLoading, displayedData.length, activeTab])
 
   const table = useReactTable({
     data: displayedData,
@@ -419,8 +461,8 @@ export function CategoryTable({
         onValueChange={setActiveTab}
         className="w-full flex-col justify-start gap-6"
       >
-        <div className="flex items-center justify-between px-4 lg:px-6">
-          <TabsList className="flex **:data-[slot=badge]:size-5 **:data-[slot=badge]:rounded-full **:data-[slot=badge]:bg-muted-foreground/30 **:data-[slot=badge]:px-1">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between px-4 lg:px-6 w-full">
+          <TabsList className="w-full flex justify-start overflow-x-auto no-scrollbar md:w-auto **:data-[slot=badge]:size-5 **:data-[slot=badge]:rounded-full **:data-[slot=badge]:bg-muted-foreground/30 **:data-[slot=badge]:px-1">
             <TabsTrigger value="all">
               All Categories <Badge variant="secondary">{data.filter(d => d.status !== "Deleted").length}</Badge>
             </TabsTrigger>
@@ -434,16 +476,16 @@ export function CategoryTable({
               Deleted <Badge variant="secondary">{data.filter(d => d.status === "Deleted").length}</Badge>
             </TabsTrigger>
           </TabsList>
-          <div className="flex items-center gap-2">
+          <div className="flex w-full flex-col md:flex-row items-center gap-2 *:w-full md:*:w-auto md:w-auto md:*:flex-none">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" className="w-full">
                   <Columns3Icon data-icon="inline-start" />
                   Columns
                   <ChevronDownIcon data-icon="inline-end" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-32">
+              <DropdownMenuContent align="end" className="w-48">
                 {table
                   .getAllColumns()
                   .filter(
@@ -461,7 +503,7 @@ export function CategoryTable({
                           column.toggleVisibility(!!value)
                         }
                       >
-                        {column.id}
+                        {columnLabels[column.id] || column.id}
                       </DropdownMenuCheckboxItem>
                     )
                   })}
@@ -470,6 +512,7 @@ export function CategoryTable({
             <Button
               variant="outline"
               size="sm"
+              className="w-full animate-none"
               onClick={() => {
                 setSelectedItem(null)
                 setDrawerMode("create")
@@ -477,7 +520,7 @@ export function CategoryTable({
               }}
             >
               <PlusIcon />
-              <span className="hidden lg:inline">Add Category</span>
+              <span>Add Category</span>
             </Button>
           </div>
         </div>
@@ -485,7 +528,7 @@ export function CategoryTable({
           value={activeTab}
           className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6"
         >
-          <div className="overflow-hidden rounded-lg border">
+          <div className="overflow-x-auto rounded-lg border">
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-muted">
                 {table.getHeaderGroups().map((headerGroup) => (
@@ -506,7 +549,36 @@ export function CategoryTable({
                 ))}
               </TableHeader>
               <TableBody>
-                {table.getRowModel().rows?.length ? (
+                {isLoading ? (
+                  Array.from({ length: skeletonCount }).map((_, rowIndex) => (
+                    <TableRow key={`skeleton-${rowIndex}`} className="hover:bg-transparent">
+                      {table.getVisibleFlatColumns().map((column) => {
+                        let cellClass = ""
+                        let skeletonClass = "h-4 rounded bg-muted-foreground/10 animate-pulse"
+                        
+                        if (column.id === "header") {
+                          skeletonClass += " w-32"
+                        } else if (column.id === "type") {
+                          skeletonClass += " w-24 h-5 rounded-full"
+                        } else if (column.id === "status" || column.id === "level") {
+                          skeletonClass += " w-20 h-5 rounded-full"
+                        } else if (column.id === "limit") {
+                          skeletonClass += " w-48"
+                        } else if (column.id === "actions") {
+                          skeletonClass += " size-8 rounded-md ml-auto"
+                        } else {
+                          skeletonClass += " w-full max-w-[100px]"
+                        }
+                        
+                        return (
+                          <TableCell key={column.id} className={cellClass}>
+                            <div className={skeletonClass} />
+                          </TableCell>
+                        )
+                      })}
+                    </TableRow>
+                  ))
+                ) : table.getRowModel().rows?.length ? (
                   table.getRowModel().rows.map((row) => (
                     <TableRow key={row.id}>
                       {row.getVisibleCells().map((cell) => (

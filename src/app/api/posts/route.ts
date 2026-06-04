@@ -5,6 +5,15 @@ export async function GET(req: NextRequest) {
   try {
     const client = await clientPromise
     const db = client.db()
+    const url = new URL(req.url)
+    const id = url.searchParams.get("id")
+    if (id) {
+      const post = await db.collection("posts").findOne({ id: Number(id) })
+      if (!post) {
+        return NextResponse.json({ error: "Post not found" }, { status: 404 })
+      }
+      return NextResponse.json(post)
+    }
     const posts = await db.collection("posts").find({}).toArray()
     return NextResponse.json(posts)
   } catch (error: any) {
@@ -60,6 +69,7 @@ export async function DELETE(req: NextRequest) {
   try {
     const url = new URL(req.url)
     const id = url.searchParams.get("id")
+    const permanent = url.searchParams.get("permanent")
     if (!id) {
       return NextResponse.json({ error: "Missing post ID" }, { status: 400 })
     }
@@ -67,11 +77,16 @@ export async function DELETE(req: NextRequest) {
     const client = await clientPromise
     const db = client.db()
     
-    // Soft delete
-    await db.collection("posts").updateOne(
-      { id: Number(id) },
-      { $set: { status: "Deleted" } }
-    )
+    if (permanent === "true") {
+      // Hard delete
+      await db.collection("posts").deleteOne({ id: Number(id) })
+    } else {
+      // Soft delete
+      await db.collection("posts").updateOne(
+        { id: Number(id) },
+        { $set: { status: "Deleted" } }
+      )
+    }
     
     return NextResponse.json({ success: true })
   } catch (error: any) {
