@@ -4,26 +4,33 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowRight, BookOpen, User, Calendar } from "lucide-react";
 
-export const dynamic = "force-dynamic";
+import { unstable_cache } from "next/cache";
 
-async function getPublishedPosts() {
-  try {
-    const client = await clientPromise;
-    const db = client.db();
-    const posts = await db
-      .collection("posts")
-      .find({ status: "Done" })
-      .sort({ id: -1 })
-      .toArray();
-    return JSON.parse(JSON.stringify(posts));
-  } catch (error) {
-    console.error("Failed to fetch published posts", error);
-    return [];
+const getCachedPublishedPosts = unstable_cache(
+  async () => {
+    try {
+      const client = await clientPromise;
+      const db = client.db();
+      const posts = await db
+        .collection("posts")
+        .find({ status: "Done" })
+        .sort({ id: -1 })
+        .toArray();
+      return JSON.parse(JSON.stringify(posts));
+    } catch (error) {
+      console.error("Failed to fetch published posts", error);
+      return [];
+    }
+  },
+  ["published-posts"],
+  {
+    tags: ["posts-public"],
+    revalidate: 60, // Fallback revalidation every 60 seconds
   }
-}
+);
 
 export default async function Home() {
-  const posts = await getPublishedPosts();
+  const posts = await getCachedPublishedPosts();
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex flex-col font-sans">

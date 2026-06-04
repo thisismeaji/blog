@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import clientPromise from "@/lib/mongodb"
+import { revalidatePath, revalidateTag } from "next/cache"
 
 export async function GET(req: NextRequest) {
   try {
@@ -37,6 +38,8 @@ export async function POST(req: NextRequest) {
     }
 
     await db.collection("posts").insertOne(newPost)
+    revalidatePath("/")
+    revalidateTag("posts-public")
     return NextResponse.json({ success: true, post: newPost })
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
@@ -58,7 +61,8 @@ export async function PUT(req: NextRequest) {
       { id: Number(id) },
       { $set: updateData }
     )
-    
+    revalidatePath("/")
+    revalidateTag("posts-public")
     return NextResponse.json({ success: true })
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
@@ -87,7 +91,8 @@ export async function DELETE(req: NextRequest) {
         { $set: { status: "Deleted" } }
       )
     }
-    
+    revalidatePath("/")
+    revalidateTag("posts-public")
     return NextResponse.json({ success: true })
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
