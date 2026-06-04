@@ -315,6 +315,7 @@ export function DataTable({
   data: z.infer<typeof schema>[]
 }) {
   const [data, setData] = React.useState<z.infer<typeof schema>[]>([])
+  const [categories, setCategories] = React.useState<any[]>([])
   const [activeTab, setActiveTab] = React.useState("all")
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({})
@@ -338,8 +339,14 @@ export function DataTable({
       if (Array.isArray(json)) {
         setData(json)
       }
+      
+      const catRes = await fetch("/api/categories")
+      const catJson = await catRes.json()
+      if (Array.isArray(catJson)) {
+        setCategories(catJson)
+      }
     } catch (err) {
-      console.error("Failed to load posts", err)
+      console.error("Failed to load data", err)
     }
   }
 
@@ -650,6 +657,7 @@ export function DataTable({
         onOpenChange={setDrawerOpen}
         mode={drawerMode}
         onSave={handleSave}
+        categories={categories}
       />
     </>
   )
@@ -681,9 +689,10 @@ interface TableCellViewerProps {
   onOpenChange: (open: boolean) => void
   mode: "view" | "edit"
   onSave?: (updatedItem: z.infer<typeof schema>) => void
+  categories: any[]
 }
 
-function TableCellViewer({ item, open, onOpenChange, mode, onSave }: TableCellViewerProps) {
+function TableCellViewer({ item, open, onOpenChange, mode, onSave, categories }: TableCellViewerProps) {
   const isMobile = useIsMobile()
 
   // Form states
@@ -809,11 +818,21 @@ function TableCellViewer({ item, open, onOpenChange, mode, onSave }: TableCellVi
                   </SelectTrigger>
                   <SelectContent>
                     <SelectGroup>
-                      <SelectItem value="Technology">Technology</SelectItem>
-                      <SelectItem value="Design">Design</SelectItem>
-                      <SelectItem value="Tutorials">Tutorials</SelectItem>
-                      <SelectItem value="Management">Management</SelectItem>
-                      <SelectItem value="Marketing">Marketing</SelectItem>
+                      {categories.length > 0 ? (
+                        categories.map((cat) => (
+                          <SelectItem key={cat.id} value={cat.header}>
+                            {cat.header}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <>
+                          <SelectItem value="Technology">Technology</SelectItem>
+                          <SelectItem value="Design">Design</SelectItem>
+                          <SelectItem value="Tutorials">Tutorials</SelectItem>
+                          <SelectItem value="Management">Management</SelectItem>
+                          <SelectItem value="Marketing">Marketing</SelectItem>
+                        </>
+                      )}
                     </SelectGroup>
                   </SelectContent>
                 </Select>

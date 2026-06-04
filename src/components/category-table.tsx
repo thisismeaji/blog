@@ -18,6 +18,7 @@ import {
 import { Area, AreaChart, CartesianGrid, XAxis } from "recharts"
 import { toast } from "sonner"
 import { z } from "zod"
+import { useSession } from "next-auth/react"
 
 import { useIsMobile } from "@/hooks/use-mobile"
 import { Badge } from "@/components/ui/badge"
@@ -46,6 +47,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import {
   Select,
@@ -78,8 +80,9 @@ export const schema = z.object({
   type: z.string(),   // Slug
   status: z.string(), // Done = Active, In Process = Inactive, Deleted = Deleted
   target: z.string(), // Views
-  limit: z.string(),  // Comments
+  limit: z.string(),  // Description
   reviewer: z.string(), // Creator
+  level: z.string().optional(), // Category Type (Parent vs Child)
 })
 
 const columns: ColumnDef<z.infer<typeof schema>>[] = [
@@ -141,62 +144,31 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
     },
   },
   {
-    accessorKey: "target",
-    header: () => <div className="w-full text-right">Views</div>,
-    cell: ({ row }) => (
-      <form
-        onSubmit={(e) => {
-          e.preventDefault()
-          toast.promise(new Promise((resolve) => setTimeout(resolve, 1000)), {
-            loading: `Saving ${row.original.header}`,
-            success: "Done",
-            error: "Error",
-          })
-        }}
-      >
-        <Label htmlFor={`${row.original.id}-target`} className="sr-only">
-          Views
-        </Label>
-        <Input
-          className="h-8 w-16 border-transparent bg-transparent text-right shadow-none hover:bg-input/30 focus-visible:border focus-visible:bg-background dark:bg-transparent dark:hover:bg-input/30 dark:focus-visible:bg-input/30"
-          defaultValue={row.original.target}
-          id={`${row.original.id}-target`}
-        />
-      </form>
-    ),
-  },
-  {
-    accessorKey: "limit",
-    header: () => <div className="w-full text-right">Comments</div>,
-    cell: ({ row }) => (
-      <form
-        onSubmit={(e) => {
-          e.preventDefault()
-          toast.promise(new Promise((resolve) => setTimeout(resolve, 1000)), {
-            loading: `Saving ${row.original.header}`,
-            success: "Done",
-            error: "Error",
-          })
-        }}
-      >
-        <Label htmlFor={`${row.original.id}-limit`} className="sr-only">
-          Comments
-        </Label>
-        <Input
-          className="h-8 w-16 border-transparent bg-transparent text-right shadow-none hover:bg-input/30 focus-visible:border focus-visible:bg-background dark:bg-transparent dark:hover:bg-input/30 dark:focus-visible:bg-input/30"
-          defaultValue={row.original.limit}
-          id={`${row.original.id}-limit`}
-        />
-      </form>
-    ),
-  },
-  {
-    accessorKey: "reviewer",
-    header: "Creator",
+    accessorKey: "level",
+    header: "Category Type",
     cell: ({ row }) => {
-      return row.original.reviewer
+      const level = row.original.level || "Parent"
+      let variant: "default" | "secondary" | "outline" | "destructive" = "secondary"
+      if (level === "Parent") variant = "default"
+      if (level === "Child") variant = "outline"
+      return (
+        <Badge variant={variant} className="px-1.5">
+          {level}
+        </Badge>
+      )
     },
   },
+
+  {
+    accessorKey: "limit",
+    header: "Description",
+    cell: ({ row }) => (
+      <span className="text-sm text-muted-foreground line-clamp-1 max-w-[200px]">
+        {row.original.limit || "No description"}
+      </span>
+    ),
+  },
+
   {
     id: "actions",
     cell: ({ row, table }) => {
@@ -204,6 +176,7 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
       const onEdit = (table.options.meta as any)?.onEdit
       const onDelete = (table.options.meta as any)?.onDelete
       const onRestore = (table.options.meta as any)?.onRestore
+      const onDeletePermanent = (table.options.meta as any)?.onDeletePermanent
       const isDeleted = row.original.status === "Deleted"
 
       return (
@@ -227,9 +200,17 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             {isDeleted ? (
-              <DropdownMenuItem onClick={() => onRestore?.(row.original.id)}>
-                Restore
-              </DropdownMenuItem>
+              <>
+                <DropdownMenuItem onClick={() => onRestore?.(row.original.id)}>
+                  Restore
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  variant="destructive"
+                  onClick={() => onDeletePermanent?.(row.original.id)}
+                >
+                  Delete Permanent
+                </DropdownMenuItem>
+              </>
             ) : (
               <DropdownMenuItem
                 variant="destructive"
@@ -250,6 +231,9 @@ export function CategoryTable({
 }: {
   data: z.infer<typeof schema>[]
 }) {
+  const { data: session } = useSession()
+  const isAdmin = (session?.user as any)?.role === "Administrator"
+
   const [data, setData] = React.useState<z.infer<typeof schema>[]>([])
   const [activeTab, setActiveTab] = React.useState("all")
   const [columnVisibility, setColumnVisibility] =
@@ -265,7 +249,7 @@ export function CategoryTable({
 
   const [selectedItem, setSelectedItem] = React.useState<z.infer<typeof schema> | null>(null)
   const [drawerOpen, setDrawerOpen] = React.useState(false)
-  const [drawerMode, setDrawerMode] = React.useState<"view" | "edit">("view")
+  const [drawerMode, setDrawerMode] = React.useState<"view" | "edit" | "create">("view")
 
   const loadData = async () => {
     try {
@@ -300,6 +284,30 @@ export function CategoryTable({
     } catch (err) {
       console.error("Save error", err)
       toast.error("An error occurred while saving")
+    }
+  }
+
+  const handleCreate = async (newItem: Omit<z.infer<typeof schema>, "id">) => {
+    try {
+      const res = await fetch("/api/categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newItem),
+      })
+      if (res.ok) {
+        const json = await res.json()
+        if (json.success && json.category) {
+          setData((prev) => [...prev, json.category])
+          toast.success("Category created successfully")
+        } else {
+          toast.error("Failed to create category")
+        }
+      } else {
+        toast.error("Failed to create category")
+      }
+    } catch (err) {
+      console.error("Create error", err)
+      toast.error("An error occurred while creating category")
     }
   }
 
@@ -356,7 +364,7 @@ export function CategoryTable({
             setData((prev) =>
               prev.map((item) => (item.id === id ? { ...item, status: "Deleted" } : item))
             )
-            toast.success("Category marked as deleted")
+            toast.success("Category deleted successfully")
           } else {
             toast.error("Failed to delete category")
           }
@@ -376,13 +384,29 @@ export function CategoryTable({
             setData((prev) =>
               prev.map((item) => (item.id === id ? { ...item, status: "Done" } : item))
             )
-            toast.success("Category restored as active")
+            toast.success("Category restored successfully")
           } else {
             toast.error("Failed to restore category")
           }
         } catch (err) {
           console.error("Restore error", err)
           toast.error("An error occurred while restoring")
+        }
+      },
+      onDeletePermanent: async (id: number) => {
+        try {
+          const res = await fetch(`/api/categories?id=${id}&permanent=true`, {
+            method: "DELETE",
+          })
+          if (res.ok) {
+            setData((prev) => prev.filter((item) => item.id !== id))
+            toast.success("Category permanently deleted")
+          } else {
+            toast.error("Failed to permanently delete category")
+          }
+        } catch (err) {
+          console.error("Permanent delete error", err)
+          toast.error("An error occurred while permanently deleting category")
         }
       },
     },
@@ -446,7 +470,11 @@ export function CategoryTable({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => toast.info("Creating categories is managed under administrative settings.")}
+              onClick={() => {
+                setSelectedItem(null)
+                setDrawerMode("create")
+                setDrawerOpen(true)
+              }}
             >
               <PlusIcon />
               <span className="hidden lg:inline">Add Category</span>
@@ -584,6 +612,7 @@ export function CategoryTable({
         onOpenChange={setDrawerOpen}
         mode={drawerMode}
         onSave={handleSave}
+        onCreate={handleCreate}
       />
     </>
   )
@@ -613,38 +642,87 @@ interface TableCellViewerProps {
   item: z.infer<typeof schema> | null
   open: boolean
   onOpenChange: (open: boolean) => void
-  mode: "view" | "edit"
+  mode: "view" | "edit" | "create"
   onSave?: (updatedItem: z.infer<typeof schema>) => void
+  onCreate?: (newItem: Omit<z.infer<typeof schema>, "id">) => void
 }
 
-function TableCellViewer({ item, open, onOpenChange, mode, onSave }: TableCellViewerProps) {
+function TableCellViewer({ item, open, onOpenChange, mode, onSave, onCreate }: TableCellViewerProps) {
   const isMobile = useIsMobile()
+  const { data: session } = useSession()
 
   // Form states
   const [header, setHeader] = React.useState("")
   const [type, setType] = React.useState("")
+  const [isManualSlug, setIsManualSlug] = React.useState(false)
   const [status, setStatus] = React.useState("")
   const [target, setTarget] = React.useState("")
   const [limit, setLimit] = React.useState("")
   const [reviewer, setReviewer] = React.useState("")
+  const [level, setLevel] = React.useState("")
 
-  // Sync state when item changes
+  // Sync state when item or mode changes (only when drawer is open)
   React.useEffect(() => {
-    if (item) {
-      setHeader(item.header)
-      setType(item.type)
-      setStatus(item.status)
-      setTarget(item.target)
-      setLimit(item.limit)
-      setReviewer(item.reviewer)
+    if (open) {
+      if (mode === "create") {
+        setHeader("")
+        setType("")
+        setIsManualSlug(false)
+        setStatus("Done")
+        setTarget("0")
+        setLimit("")
+        setReviewer(session?.user?.name || "Administrator")
+        setLevel("Parent")
+      } else if (item) {
+        setHeader(item.header)
+        setType(item.type)
+        setIsManualSlug(true)
+        setStatus(item.status)
+        setTarget(item.target)
+        setLimit(item.limit)
+        setReviewer(item.reviewer)
+        setLevel(item.level || "Parent")
+      }
     }
-  }, [item])
+  }, [item, mode, open])
 
-  if (!item) return null
+  // Auto-generate slug from Category Name if not manually edited
+  React.useEffect(() => {
+    if (!isManualSlug && mode === "create") {
+      setType(
+        header
+          .toLowerCase()
+          .trim()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/(^-|-$)+/g, "")
+      )
+    }
+  }, [header, isManualSlug, mode])
+
+  // Update reviewer name when session loads while drawer is open
+  React.useEffect(() => {
+    if (mode === "create" && open && session?.user?.name) {
+      setReviewer(session.user.name)
+    }
+  }, [session, mode, open])
+
+  if (!item && mode !== "create") return null
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (onSave) {
+    if (mode === "create") {
+      if (onCreate) {
+        onCreate({
+          header,
+          type,
+          status,
+          target,
+          limit,
+          reviewer,
+          level,
+        })
+      }
+    } else if (item && onSave) {
       onSave({
         id: item.id,
         header,
@@ -653,19 +731,24 @@ function TableCellViewer({ item, open, onOpenChange, mode, onSave }: TableCellVi
         target,
         limit,
         reviewer,
+        level,
       })
+      toast.success("Category updated successfully")
     }
     onOpenChange(false)
-    toast.success(`"${header}" updated successfully`)
   }
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange} direction={isMobile ? "bottom" : "right"}>
       <DrawerContent>
         <DrawerHeader className="gap-1">
-          <DrawerTitle>{header || "Category Details"}</DrawerTitle>
+          <DrawerTitle>{header || (mode === "create" ? "Create Category" : "Category Details")}</DrawerTitle>
           <DrawerDescription>
-            {mode === "edit" ? "Edit Category Details & Metrics" : "Category Details & Metrics"}
+            {mode === "create"
+              ? "Fill in the details to create a new category"
+              : mode === "edit"
+              ? "Edit Category Details & Metrics"
+              : "Category Details & Metrics"}
           </DrawerDescription>
         </DrawerHeader>
         <div className="flex flex-col gap-4 overflow-y-auto px-4 text-sm">
@@ -740,7 +823,15 @@ function TableCellViewer({ item, open, onOpenChange, mode, onSave }: TableCellVi
                 <Input
                   id="type"
                   value={type}
-                  onChange={(e) => setType(e.target.value)}
+                  onChange={(e) => {
+                    setIsManualSlug(true)
+                    setType(
+                      e.target.value
+                        .toLowerCase()
+                        .replace(/\s+/g, "-")
+                        .replace(/[^a-z0-9-]/g, "")
+                    )
+                  }}
                   disabled={mode === "view"}
                 />
               </div>
@@ -760,52 +851,40 @@ function TableCellViewer({ item, open, onOpenChange, mode, onSave }: TableCellVi
                 </Select>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col gap-3">
-                <Label htmlFor="target">Views</Label>
-                <Input
-                  id="target"
-                  value={target}
-                  onChange={(e) => setTarget(e.target.value)}
-                  disabled={mode === "view"}
-                />
-              </div>
-              <div className="flex flex-col gap-3">
-                <Label htmlFor="limit">Comments</Label>
-                <Input
-                  id="limit"
-                  value={limit}
-                  onChange={(e) => setLimit(e.target.value)}
-                  disabled={mode === "view"}
-                />
-              </div>
-            </div>
+             <div className="flex flex-col gap-3">
+               <Label htmlFor="level">Category Type</Label>
+               <Select value={level} onValueChange={setLevel} disabled={mode === "view"}>
+                 <SelectTrigger id="level" className="w-full">
+                   <SelectValue placeholder="Select type" />
+                 </SelectTrigger>
+                 <SelectContent>
+                   <SelectGroup>
+                     <SelectItem value="Parent">Parent (Induk)</SelectItem>
+                     <SelectItem value="Child">Child (Sub-Kategori)</SelectItem>
+                   </SelectGroup>
+                 </SelectContent>
+               </Select>
+             </div>
             <div className="flex flex-col gap-3">
-              <Label htmlFor="reviewer">Creator</Label>
-              <Select value={reviewer} onValueChange={setReviewer} disabled={mode === "view"}>
-                <SelectTrigger id="reviewer" className="w-full">
-                  <SelectValue placeholder="Select creator" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectItem value="Sarah Chen">Sarah Chen</SelectItem>
-                    <SelectItem value="Eddie Lake">Eddie Lake</SelectItem>
-                    <SelectItem value="Thomas Wilson">Thomas Wilson</SelectItem>
-                    <SelectItem value="Raj Patel">Raj Patel</SelectItem>
-                    <SelectItem value="Leila Ahmadi">Leila Ahmadi</SelectItem>
-                    <SelectItem value="Alex Thompson">Alex Thompson</SelectItem>
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
+              <Label htmlFor="limit">Description</Label>
+              <Textarea
+                id="limit"
+                value={limit}
+                onChange={(e) => setLimit(e.target.value)}
+                disabled={mode === "view"}
+                placeholder="Enter category description..."
+                className="min-h-[100px]"
+              />
             </div>
+
           </form>
         </div>
         <DrawerFooter>
-          {mode === "edit" ? (
+          {mode === "edit" || mode === "create" ? (
             <Button type="submit" form="drawer-post-form">Submit</Button>
           ) : null}
           <DrawerClose asChild>
-            <Button variant="outline">{mode === "edit" ? "Cancel" : "Done"}</Button>
+            <Button variant="outline">{mode === "edit" || mode === "create" ? "Cancel" : "Done"}</Button>
           </DrawerClose>
         </DrawerFooter>
       </DrawerContent>

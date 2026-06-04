@@ -35,6 +35,23 @@ export default function Page() {
 
   // Writing/Reading settings state
   const [defaultCategory, setDefaultCategory] = React.useState("Technology")
+  const [categories, setCategories] = React.useState<any[]>([])
+
+  React.useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const res = await fetch("/api/categories")
+        const data = await res.json()
+        if (Array.isArray(data)) {
+          setCategories(data.filter((c) => c.status !== "Deleted"))
+        }
+      } catch (err) {
+        console.error("Failed to fetch categories", err)
+      }
+    }
+    fetchCategories()
+  }, [])
+
   const [postsPerPage, setPostsPerPage] = React.useState("10")
   const [allowComments, setAllowComments] = React.useState(true)
 
@@ -145,11 +162,21 @@ export default function Page() {
                           </SelectTrigger>
                           <SelectContent>
                             <SelectGroup>
-                              <SelectItem value="Technology">Technology</SelectItem>
-                              <SelectItem value="Design">Design</SelectItem>
-                              <SelectItem value="Tutorials">Tutorials</SelectItem>
-                              <SelectItem value="Marketing">Marketing</SelectItem>
-                              <SelectItem value="Management">Management</SelectItem>
+                              {categories.length > 0 ? (
+                                categories.map((cat) => (
+                                  <SelectItem key={cat.id} value={cat.header}>
+                                    {cat.header}
+                                  </SelectItem>
+                                ))
+                              ) : (
+                                <>
+                                  <SelectItem value="Technology">Technology</SelectItem>
+                                  <SelectItem value="Design">Design</SelectItem>
+                                  <SelectItem value="Tutorials">Tutorials</SelectItem>
+                                  <SelectItem value="Marketing">Marketing</SelectItem>
+                                  <SelectItem value="Management">Management</SelectItem>
+                                </>
+                              )}
                             </SelectGroup>
                           </SelectContent>
                         </Select>

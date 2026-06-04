@@ -38,6 +38,7 @@ import { toast } from "sonner"
 export default function Page() {
   const [posts, setPosts] = React.useState<any[]>([])
   const [comments, setComments] = React.useState<any[]>([])
+  const [categories, setCategories] = React.useState<any[]>([])
   const [draftTitle, setDraftTitle] = React.useState("")
   const [draftContent, setDraftContent] = React.useState("")
   const [draftCategory, setDraftCategory] = React.useState("Technology")
@@ -53,6 +54,11 @@ export default function Page() {
       const commentsJson = await commentsRes.json()
       if (Array.isArray(commentsJson)) {
         setComments(commentsJson)
+      }
+      const catRes = await fetch("/api/categories")
+      const catJson = await catRes.json()
+      if (Array.isArray(catJson)) {
+        setCategories(catJson)
       }
     } catch (err) {
       console.error("Failed to load dashboard data", err)
@@ -315,11 +321,23 @@ export default function Page() {
                             </SelectTrigger>
                             <SelectContent>
                               <SelectGroup>
-                                <SelectItem value="Technology">Technology</SelectItem>
-                                <SelectItem value="Design">Design</SelectItem>
-                                <SelectItem value="Tutorials">Tutorials</SelectItem>
-                                <SelectItem value="Marketing">Marketing</SelectItem>
-                                <SelectItem value="Management">Management</SelectItem>
+                                {categories.length > 0 ? (
+                                  categories
+                                    .filter((cat) => cat.status !== "Deleted")
+                                    .map((cat) => (
+                                      <SelectItem key={cat.id} value={cat.header}>
+                                        {cat.header}
+                                      </SelectItem>
+                                    ))
+                                ) : (
+                                  <>
+                                    <SelectItem value="Technology">Technology</SelectItem>
+                                    <SelectItem value="Design">Design</SelectItem>
+                                    <SelectItem value="Tutorials">Tutorials</SelectItem>
+                                    <SelectItem value="Marketing">Marketing</SelectItem>
+                                    <SelectItem value="Management">Management</SelectItem>
+                                  </>
+                                )}
                               </SelectGroup>
                             </SelectContent>
                           </Select>

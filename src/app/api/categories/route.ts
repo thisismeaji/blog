@@ -59,6 +59,7 @@ export async function DELETE(req: NextRequest) {
   try {
     const url = new URL(req.url)
     const id = url.searchParams.get("id")
+    const permanent = url.searchParams.get("permanent") === "true"
     if (!id) {
       return NextResponse.json({ error: "Missing category ID" }, { status: 400 })
     }
@@ -66,11 +67,16 @@ export async function DELETE(req: NextRequest) {
     const client = await clientPromise
     const db = client.db()
     
-    // Soft delete
-    await db.collection("categories").updateOne(
-      { id: Number(id) },
-      { $set: { status: "Deleted" } }
-    )
+    if (permanent) {
+      // Hard delete
+      await db.collection("categories").deleteOne({ id: Number(id) })
+    } else {
+      // Soft delete
+      await db.collection("categories").updateOne(
+        { id: Number(id) },
+        { $set: { status: "Deleted" } }
+      )
+    }
     
     return NextResponse.json({ success: true })
   } catch (error: any) {

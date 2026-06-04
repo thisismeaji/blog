@@ -49,6 +49,22 @@ export default function AddPostPage() {
     return "draft";
   }, [publishDate]);
   const [category, setCategory] = useState("technology");
+  const [categories, setCategories] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const res = await fetch("/api/categories");
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setCategories(data.filter((c) => c.status !== "Deleted"));
+        }
+      } catch (err) {
+        console.error("Failed to fetch categories", err);
+      }
+    };
+    fetchCategories();
+  }, []);
   const [tagInput, setTagInput] = useState("");
   const [tags, setTags] = useState<string[]>(["WebDev", "React"]);
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
@@ -238,10 +254,11 @@ export default function AddPostPage() {
 
     setIsPublishing(true);
     try {
-      const categoryFormatted = category.charAt(0).toUpperCase() + category.slice(1);
+      const selectedCat = categories.find(c => c.type.toLowerCase() === category.toLowerCase() || c.header.toLowerCase() === category.toLowerCase());
+      const categoryName = selectedCat ? selectedCat.header : (category.charAt(0).toUpperCase() + category.slice(1));
       const postData = {
         header: title,
-        type: categoryFormatted,
+        type: categoryName,
         status: "Done",
         target: "0",
         limit: "0",
@@ -256,7 +273,7 @@ export default function AddPostPage() {
 
       if (res.ok) {
         toast.success("Post Published Successfully!", {
-          description: `"${title}" has been published under ${category.toUpperCase()}.`,
+          description: `"${title}" has been published under ${categoryName.toUpperCase()}.`,
           duration: 4000,
         });
         setTimeout(() => {
@@ -284,10 +301,11 @@ export default function AddPostPage() {
     setIsSaving(true);
     setSaveStatus("saving");
     try {
-      const categoryFormatted = category.charAt(0).toUpperCase() + category.slice(1);
+      const selectedCat = categories.find(c => c.type.toLowerCase() === category.toLowerCase() || c.header.toLowerCase() === category.toLowerCase());
+      const categoryName = selectedCat ? selectedCat.header : (category.charAt(0).toUpperCase() + category.slice(1));
       const postData = {
         header: title,
-        type: categoryFormatted,
+        type: categoryName,
         status: "In Process",
         target: "0",
         limit: "0",
@@ -398,11 +416,21 @@ export default function AddPostPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="technology">Technology</SelectItem>
-                  <SelectItem value="lifestyle">Lifestyle</SelectItem>
-                  <SelectItem value="business">Business</SelectItem>
-                  <SelectItem value="travel">Travel</SelectItem>
-                  <SelectItem value="opinion">Opinion</SelectItem>
+                  {categories.length > 0 ? (
+                    categories.map((cat) => (
+                      <SelectItem key={cat.id} value={cat.type.toLowerCase()}>
+                        {cat.header}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <>
+                      <SelectItem value="technology">Technology</SelectItem>
+                      <SelectItem value="lifestyle">Lifestyle</SelectItem>
+                      <SelectItem value="business">Business</SelectItem>
+                      <SelectItem value="travel">Travel</SelectItem>
+                      <SelectItem value="opinion">Opinion</SelectItem>
+                    </>
+                  )}
                 </SelectContent>
               </Select>
             </div>

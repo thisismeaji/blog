@@ -48,7 +48,7 @@ const data = {
       icon: <FileTextIcon className="size-4" />,
     },
     {
-      title: "Kategori",
+      title: "Category",
       url: "/dashboard/category",
       icon: <FolderIcon className="size-4" />,
     },
